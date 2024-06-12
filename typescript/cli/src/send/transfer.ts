@@ -7,6 +7,7 @@ import {
   TokenAmount,
   WarpCore,
   WarpCoreConfig,
+  WarpCoreConfigSchema,
 } from '@hyperlane-xyz/sdk';
 import { timeout } from '@hyperlane-xyz/utils';
 
@@ -30,7 +31,7 @@ export async function sendTestTransfer({
   selfRelay,
 }: {
   context: WriteCommandContext;
-  warpConfigPath: string;
+  warpConfigPath?: string;
   origin?: ChainName;
   destination?: ChainName;
   wei: string;
@@ -39,9 +40,22 @@ export async function sendTestTransfer({
   skipWaitForDelivery: boolean;
   selfRelay?: boolean;
 }) {
-  const { chainMetadata } = context;
+  const { chainMetadata, registry } = context;
 
-  const warpCoreConfig = readWarpRouteConfig(warpConfigPath);
+  let warpCoreConfig: WarpCoreConfig;
+  if (warpConfigPath) {
+    warpCoreConfig = readWarpRouteConfig(warpConfigPath);
+  } else {
+    const routeId = ''; // TODO: What is this ?
+    const safeParsedWarpCoreConfig = WarpCoreConfigSchema.safeParse(
+      await registry.getWarpRoute(routeId),
+    );
+    if (!safeParsedWarpCoreConfig.success)
+      throw new Error(
+        `Error parsing warp route config from registry: ${safeParsedWarpCoreConfig.error.message}`,
+      );
+    warpCoreConfig = safeParsedWarpCoreConfig.data;
+  }
 
   if (!origin) {
     origin = await runSingleChainSelectionStep(
