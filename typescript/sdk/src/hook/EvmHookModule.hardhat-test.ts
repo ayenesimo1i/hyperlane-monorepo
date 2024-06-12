@@ -29,6 +29,7 @@ import {
   HookConfig,
   HookType,
   IMMUTABLE_HOOK_TYPE,
+  IgpHookConfig,
   PausableHookConfig,
   ProtocolFeeHookConfig,
 } from './types.js';
@@ -441,7 +442,77 @@ describe('EvmHookModule', async () => {
         .false;
     });
 
-    // TODO: INTERCHAIN_GAS_PAYMASTER
+    const createDeployerOwnedIgpHookConfig =
+      async (): Promise<IgpHookConfig> => {
+        const owner = await multiProvider.getSignerAddress(chain);
+        return {
+          owner,
+          type: HookType.INTERCHAIN_GAS_PAYMASTER,
+          beneficiary: randomAddress(),
+          oracleKey: owner,
+          overhead: Object.fromEntries(
+            testChains.map((c) => [c, Math.floor(Math.random() * 100)]),
+          ),
+          oracleConfig: Object.fromEntries(
+            testChains.map((c) => [
+              c,
+              {
+                tokenExchangeRate: randomInt(1234567891234).toString(),
+                gasPrice: randomInt(1234567891234).toString(),
+              },
+            ]),
+          ),
+        };
+      };
+
+    it('should update beneficiary in IGP', async () => {
+      const config = await createDeployerOwnedIgpHookConfig();
+
+      // create a new hook
+      const { hook } = await createHook(config);
+
+      // change the beneficiary
+      config.beneficiary = randomAddress();
+
+      // expect 1 tx to update the beneficiary
+      await expectTxsAndUpdate(hook, config, 1);
+    });
+
+    it('should update the overheads in IGP', async () => {
+      const config = await createDeployerOwnedIgpHookConfig();
+
+      // create a new hook
+      const { hook } = await createHook(config);
+
+      // change the overheads
+      config.overhead = Object.fromEntries(
+        testChains.map((c) => [c, Math.floor(Math.random() * 100)]),
+      );
+
+      // expect 1 tx to update the overheads
+      await expectTxsAndUpdate(hook, config, 1);
+    });
+
+    it('should update the oracle config in IGP', async () => {
+      const config = await createDeployerOwnedIgpHookConfig();
+
+      // create a new hook
+      const { hook } = await createHook(config);
+
+      // change the oracle config
+      config.oracleConfig = Object.fromEntries(
+        testChains.map((c) => [
+          c,
+          {
+            tokenExchangeRate: randomInt(987654321).toString(),
+            gasPrice: randomInt(987654321).toString(),
+          },
+        ]),
+      );
+
+      // expect 1 tx to update the oracle config
+      await expectTxsAndUpdate(hook, config, 1);
+    });
 
     it('should update protocol fee in protocol fee hook', async () => {
       const config: ProtocolFeeHookConfig = {
